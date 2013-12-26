@@ -1,0 +1,22 @@
+{
+  "name": "winds-of-freshy",
+  "version": "0.0.0",
+  "description": "animated wind canvas",
+  "main": "index.js",
+  "directories": {
+    "example": "examples",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "grunt test"
+  },
+  "author": "chelm",
+  "license": "BSD-2-Clause",
+  "devDependencies": {
+    "grunt": "0.4.x",
+    "grunt-mocha-test": "*",
+    "grunt-contrib-jshint": "0.3.x",
+    "mocha": "*",
+    "should": "*"
+  }
+}

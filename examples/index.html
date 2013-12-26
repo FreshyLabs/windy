@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset=utf-8 />
+    <title>Windy Demo</title>
+    <link rel='stylesheet' href='css/style.css'>
+  </head>
+
+  <body onload='initMap()'>
+    <div id='map' />
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/d3/3.3.10/d3.min.js" charset="utf-8"></script>
+    <script src='https://rawgithub.com/stamen/modestmaps-js/master/modestmaps.min.js'></script>
+    <script src='../windy.js'></script>
+    <script>
+      function initMap(){
+        var provider = new com.modestmaps.TemplatedLayer('http://freshymap.com/tiles/{Y}/{X}/{Z}.png');
+        var map = new com.modestmaps.Map('map', provider); 
+        var canvas = document.createElement('canvas');
+        canvas.style.position = 'absolute';
+        canvas.style.left = '0';
+        canvas.style.top = '0';
+        canvas.width = map.dimensions.x;
+        canvas.height = map.dimensions.y;
+        map.parent.appendChild(canvas);
+
+        map.setCenterZoom(new MM.Location( 38.747, -98 ), 3);
+
+        d3.json('./data/gfs.json', function(err, data){
+          windy = new Windy({canvas: canvas, data: data});
+        });
+      
+        function update() {
+          /*var ctx = canvas.getContext('2d');
+          ctx.clearRect(0,0,canvas.width,canvas.height);
+          ctx.strokeStyle = '#404040';
+          ctx.beginPath();
+          var p = map.locationPoint(locations[0]);
+          ctx.moveTo(p.x,p.y);
+          for (var i = 1; i < locations.length; i++) {
+            p = map.locationPoint(locations[i]);
+            ctx.lineTo(p.x,p.y);
+          }
+          ctx.stroke();*/
+        }
+      
+        map.addCallback('drawn', update);
+        map.addCallback('resized', function() {
+          canvas.width = map.dimensions.x;
+          canvas.height = map.dimensions.y;
+          update();
+        });
+      
+        update();
+      }
+    </script>
+  </body>
+</html>
+
