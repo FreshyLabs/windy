@@ -3,10 +3,11 @@ Winds of Freshy
 
 A simplified library for interpolating winds vectors and speeds across a grid. Creates a location aware animated surface. 
 
-Credit: taken from: 
+### Credit 
 
-https://github.com/cambecc/earth
-https://github.com/cambecc/air 
+* mostly all of this is taken from: 
+  * https://github.com/cambecc/earth
+  * https://github.com/cambecc/air 
 
 
 1. Load data 
