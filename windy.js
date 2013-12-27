@@ -184,6 +184,48 @@ var Windy = function( params ){
         return new Array(i + 1).join("0") + s;
     }
 
+    /**
+     * Calculate distortion of the wind vector caused by the shape of the projection at point (x, y). The wind
+     * vector is modified in place and returned by this function.
+     */
+    function distort(projection, λ, φ, x, y, scale, wind) {
+        var u = wind[0] * scale;
+        var v = wind[1] * scale;
+        var d = distortion(projection, λ, φ, x, y);
+
+        // Scale distortion vectors by u and v, then add.
+        wind[0] = d[0] * u + d[2] * v;
+        wind[1] = d[1] * u + d[3] * v;
+        return wind;
+    }
+
+    function proportion(i, bounds) {
+        return (clamp(i, bounds) - bounds[0]) / (bounds[1] - bounds[0]);
+    }
+
+
+   function distortion(projection, λ, φ, x, y) {
+        var τ = 2 * Math.PI;
+        var H = Math.pow(10, -5.2);
+        var hλ = λ < 0 ? H : -H;
+        var hφ = φ < 0 ? H : -H;
+        //console.log('huh', [λ + hλ, φ]);
+        var pλ = projection([λ + hλ, φ]);
+        //console.log(pλ);
+        //zzz(pλ)
+        var pφ = projection([λ, φ + hφ]);
+
+        // Meridian scale factor (see Snyder, equation 4-3), where R = 1. This handles issue where length of 1º λ
+        // changes depending on φ. Without this, there is a pinching effect at the poles.
+        var k = Math.cos(φ / 360 * τ);
+        return [
+            (pλ[0] - x) / hλ / k,
+            (pλ[1] - y) / hλ / k,
+            (pφ[0] - x) / hφ,
+            (pφ[1] - y) / hφ
+        ];
+    }
+
 
   
   function createField(columns, bounds, callback) {
@@ -225,21 +267,27 @@ var Windy = function( params ){
   function buildBounds( bounds, width, height ) {
       var upperLeft = bounds[0];
       var lowerRight = bounds[1];
-      var x = Math.max(Math.floor(upperLeft[0], 0), 0);
+      var x = 0;  //Math.round(upperLeft[0]); //Math.max(Math.floor(upperLeft[0], 0), 0);
       var y = Math.max(Math.floor(upperLeft[1], 0), 0);
       var xMax = Math.min(Math.ceil(lowerRight[0], width), width - 1);
       var yMax = Math.min(Math.ceil(lowerRight[1], height), height - 1);
-      return {x: x, y: y, xMax: xMax, yMax: yMax, width: xMax - x + 1, height: yMax - y + 1};
+      return {x: x, y: y, xMax: xMax, yMax: yMax, width: width, height: height};
   }
+
+   function currentPosition() {
+        var λ = floorMod(new Date().getTimezoneOffset() / 4, 360);  // 24 hours * 60 min / 4 === 360 degrees
+        return [λ, 0];
+    }
 
   function interpolateField( grid, bounds, callback ) {
     //var mask = createMask(globe);
     //log.time("interpolating field");
     //var d = when.defer(), cancel = this.cancel;
 
-    //var projection = globe.projection;
+    var projection = d3.geo.mercator().rotate(currentPosition()).precision(0.1); //globe.projection;
     //var bounds = [[-180, 90], [180, -90]]; //globe.bounds(view);
     var velocityScale = bounds.height * VELOCITY_SCALE;
+    console.log('velocityScale', velocityScale);
 
     var columns = [];
     var point = [];
@@ -253,14 +301,16 @@ var Windy = function( params ){
                 point[0] = x; point[1] = y;
                 var p2 = new MM.Point(x, y);
                 var loc = map.pointLocation(p2);
-                var coord = [loc.lon, loc.lat]; //point; // TODO come back to this: projection.invert(point);
+                var coord = projection.invert(point); //[loc.lon, loc.lat]; //point; // TODO come back to this: projection.invert(point);
                 var color = TRANSPARENT_BLACK;
                 if (coord) {
                     var λ = coord[0], φ = coord[1];
                     if (isFinite(λ)) {
                         var wind = grid.interpolate(λ, φ);
                         if (wind) {
-                            //wind = distort(projection, λ, φ, x, y, velocityScale, wind);
+                            //console.log(wind);
+                            wind = distort(projection, λ, φ, x, y, velocityScale, wind);
+                            //zzz(wind);
                             column[y+1] = column[y] = wind;
                             //color = gradient(proportion(wind[2], scale.bounds), OVERLAY_ALPHA);
                         }
@@ -403,14 +453,17 @@ var Windy = function( params ){
   }
 
   function update( bounds, width, height ){
-    console.log('init the wind grid', bounds);
+    console.log('init the wind grid', bounds, buildBounds( bounds, width, height));
+    if (windy.field) windy.field.release();
     // build grid 
     buildGrid( params.data, function(grid){
       // interpolateField
-      // create Field 
+      // create Field
+      console.log('windy', windy) 
       interpolateField( grid, buildBounds( bounds, width, height), function( bounds, field ){
         // animate the canvas with random points 
         //console.log('done', field.randomize );
+        windy.field = field;
         animate( bounds, field );
       });
     });

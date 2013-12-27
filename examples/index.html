@@ -17,32 +17,55 @@
       function initMap(){
         var provider = new com.modestmaps.TemplatedLayer('http://freshymap.com/tiles/{Y}/{X}/{Z}.png');
         map = new com.modestmaps.Map('map', provider); 
+        //map.setCenterZoom(new MM.Location( 39, -99), 2);
+        map.setCenterZoom(new MM.Location( 0, 0), 2);
+
         var canvas = document.createElement('canvas');
+
+        // get corner positions 
+        var global = [[-179, 79],[ 179, -79]];
+        canvas.style.border = '2px solid red';
         canvas.style.position = 'absolute';
-        canvas.style.left = '0';
-        canvas.style.top = '0';
-        canvas.width = map.dimensions.x;
-        canvas.height = map.dimensions.y;
         map.parent.appendChild(canvas);
 
-        map.setCenterZoom(new MM.Location( 38.747, -98 ), 3);
 
         d3.json('./data/gfs.json', function(err, data){
           windy = new Windy({canvas: canvas, data: data});
           update();
         });
+
+        var adjustTO;
       
         function update() {
-          if ( windy ){
-            var size = map.dimensions;
-            var extent = map.getExtent();
-            var ul = map.locationPoint(extent.northWest());
-            var lr = map.locationPoint(extent.southEast());
-            windy.update( [[ ul.x, ul.y ], [ lr.x, lr.y ]], size.x, size.y );
-          }
+          var ctx = canvas.getContext('2d');
+          ctx.clearRect(0,0,canvas.width,canvas.height);
+          
+          if ( typeof( adjustTO ) != 'undefined' ) window.clearTimeout(adjustTO);
 
-          //var ctx = canvas.getContext('2d');
-          //ctx.clearRect(0,0,canvas.width,canvas.height);
+          adjustTO = setTimeout(function(){
+
+            var ul = map.locationPoint( new MM.Location(global[0][1], global[0][0]));
+            var lr = map.locationPoint( new MM.Location(global[1][1], global[1][0]));
+            var width = lr.x - ul.x;
+            var height = lr.y - ul.y;
+            canvas.style.left = ul.x+'px';
+            canvas.style.top = ul.y+'px';
+            canvas.width = width;
+            canvas.height = height;
+            adjustTO = undefined;
+
+            console.log(width, height)
+
+            if ( windy ){
+              var size = map.dimensions;
+              //var extent = map.getExtent();
+              //var ul = map.locationPoint(extent.northWest());
+              //var lr = map.locationPoint(extent.southEast());
+              windy.update( [[ ul.x, ul.y ], [ lr.x, lr.y ]], width, height );
+            }
+
+          }, 200);
+
           //ctx.strokeStyle = '#404040';
           //ctx.beginPath();
           //var p = map.locationPoint(locations[0]);
@@ -54,11 +77,11 @@
           //ctx.stroke();
         }
       
-        //map.addCallback('drawn', update);
+        map.addCallback('drawn', update);
         map.addCallback('resized', function() {
           canvas.width = map.dimensions.x;
           canvas.height = map.dimensions.y;
-          //update();
+          update();
         });
       
         update( );
