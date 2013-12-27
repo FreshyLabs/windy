@@ -12,9 +12,11 @@
     <script src='https://rawgithub.com/stamen/modestmaps-js/master/modestmaps.min.js'></script>
     <script src='../windy.js'></script>
     <script>
+      var map, windy;
+  
       function initMap(){
         var provider = new com.modestmaps.TemplatedLayer('http://freshymap.com/tiles/{Y}/{X}/{Z}.png');
-        var map = new com.modestmaps.Map('map', provider); 
+        map = new com.modestmaps.Map('map', provider); 
         var canvas = document.createElement('canvas');
         canvas.style.position = 'absolute';
         canvas.style.left = '0';
@@ -27,30 +29,39 @@
 
         d3.json('./data/gfs.json', function(err, data){
           windy = new Windy({canvas: canvas, data: data});
-        });
-      
-        function update() {
-          /*var ctx = canvas.getContext('2d');
-          ctx.clearRect(0,0,canvas.width,canvas.height);
-          ctx.strokeStyle = '#404040';
-          ctx.beginPath();
-          var p = map.locationPoint(locations[0]);
-          ctx.moveTo(p.x,p.y);
-          for (var i = 1; i < locations.length; i++) {
-            p = map.locationPoint(locations[i]);
-            ctx.lineTo(p.x,p.y);
-          }
-          ctx.stroke();*/
-        }
-      
-        map.addCallback('drawn', update);
-        map.addCallback('resized', function() {
-          canvas.width = map.dimensions.x;
-          canvas.height = map.dimensions.y;
           update();
         });
       
-        update();
+        function update() {
+          if ( windy ){
+            var size = map.dimensions;
+            var extent = map.getExtent();
+            var ul = map.locationPoint(extent.northWest());
+            var lr = map.locationPoint(extent.southEast());
+            windy.update( [[ ul.x, ul.y ], [ lr.x, lr.y ]], size.x, size.y );
+          }
+
+          //var ctx = canvas.getContext('2d');
+          //ctx.clearRect(0,0,canvas.width,canvas.height);
+          //ctx.strokeStyle = '#404040';
+          //ctx.beginPath();
+          //var p = map.locationPoint(locations[0]);
+          //ctx.moveTo(p.x,p.y);
+          //for (var i = 1; i < locations.length; i++) {
+          //  p = map.locationPoint(locations[i]);
+          //  ctx.lineTo(p.x,p.y);
+          //}
+          //ctx.stroke();
+        }
+      
+        //map.addCallback('drawn', update);
+        map.addCallback('resized', function() {
+          canvas.width = map.dimensions.x;
+          canvas.height = map.dimensions.y;
+          //update();
+        });
+      
+        update( );
       }
     </script>
   </body>
