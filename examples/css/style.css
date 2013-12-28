@@ -1,4 +1,5 @@
 html, body {
+  background:#000;
   width: 100%;
   height: 100%;
   font: 13px/22px 'Helvetica Neue', Helvetica, sans;
@@ -12,3 +13,7 @@ html, body {
   width: 100%;
   height: 100%;
   }
+
+canvas {
+  border: 1px solid #0ff;
+}

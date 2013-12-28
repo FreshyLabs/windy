@@ -7,7 +7,7 @@
   </head>
 
   <body onload='initMap()'>
-    <div id='map' />
+    <div id='map'></div>
     <script src="http://cdnjs.cloudflare.com/ajax/libs/d3/3.3.10/d3.min.js" charset="utf-8"></script>
     <script src='https://rawgithub.com/stamen/modestmaps-js/master/modestmaps.min.js'></script>
     <script src='../windy.js'></script>
@@ -16,52 +16,66 @@
   
       function initMap(){
         var provider = new com.modestmaps.TemplatedLayer('http://freshymap.com/tiles/{Y}/{X}/{Z}.png');
-        map = new com.modestmaps.Map('map', provider); 
-        //map.setCenterZoom(new MM.Location( 39, -99), 2);
+        map = new com.modestmaps.Map('map', []);//provider); 
         map.setCenterZoom(new MM.Location( 0, 0), 2);
 
-        var canvas = document.createElement('canvas');
-
         // get corner positions 
-        var global = [[-179, 79],[ 179, -79]];
-        canvas.style.border = '2px solid red';
-        canvas.style.position = 'absolute';
-        map.parent.appendChild(canvas);
+        var global = [[-175, 79],[ 175, -79]];
+        var ul = map.locationPoint( new MM.Location(global[0][1], global[0][0]));
+        var lr = map.locationPoint( new MM.Location(global[1][1], global[1][0]));
+        var width = lr.x - ul.x;
+        var height = lr.y - ul.y;
 
+        /*canvas.style.position = 'absolute';
+        canvas.style.border = '1px solid red';
+        canvas.style.left = ul.x+'px';
+        canvas.style.top = ul.y+'px';
+        canvas.width = width;
+        canvas.height = height;*/
+        //map.parent.appendChild(canvas);
+
+
+        var sphere = {type: "Sphere"};
+
+        projection = d3.geo.mercator().center([0,0]);
+
+        console.log("position: absolute; left: "+ul.x+"px; top: "+ul.y+"px;");
+
+        var canvas = d3.select("#map").append("canvas")
+          .attr("width", width)
+          .attr("height", height)
+          .attr("style", "position: absolute; left: "+ul.x+"px;" );
+    
+        
 
         d3.json('./data/gfs.json', function(err, data){
-          windy = new Windy({canvas: canvas, data: data});
+          windy = new Windy({canvas: canvas.node(), data: data});
           update();
         });
 
         var adjustTO;
       
         function update() {
-          var ctx = canvas.getContext('2d');
-          ctx.clearRect(0,0,canvas.width,canvas.height);
+          var ctx = canvas.node().getContext('2d');
+          ctx.clearRect(0, 0, width, height);
           
           if ( typeof( adjustTO ) != 'undefined' ) window.clearTimeout(adjustTO);
 
           adjustTO = setTimeout(function(){
 
-            var ul = map.locationPoint( new MM.Location(global[0][1], global[0][0]));
+/*            var ul = map.locationPoint( new MM.Location(global[0][1], global[0][0]));
             var lr = map.locationPoint( new MM.Location(global[1][1], global[1][0]));
-            var width = lr.x - ul.x;
-            var height = lr.y - ul.y;
-            canvas.style.left = ul.x+'px';
-            canvas.style.top = ul.y+'px';
-            canvas.width = width;
-            canvas.height = height;
+            var width = lr.x + ul.x;
+            var height = lr.y + ul.y;*/
             adjustTO = undefined;
 
-            console.log(width, height)
-
             if ( windy ){
-              var size = map.dimensions;
               //var extent = map.getExtent();
               //var ul = map.locationPoint(extent.northWest());
               //var lr = map.locationPoint(extent.southEast());
-              windy.update( [[ ul.x, ul.y ], [ lr.x, lr.y ]], width, height );
+              //console.log(d3.geo.path().projection(projection).bounds(sphere));
+              var bounds = d3.geo.path().projection(projection).bounds(sphere);
+              windy.update( bounds, width, height );
             }
 
           }, 200);
@@ -77,12 +91,12 @@
           //ctx.stroke();
         }
       
-        map.addCallback('drawn', update);
+        /*map.addCallback('drawn', update);
         map.addCallback('resized', function() {
           canvas.width = map.dimensions.x;
           canvas.height = map.dimensions.y;
           update();
-        });
+        });*/
       
         update( );
       }

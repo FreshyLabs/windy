@@ -19,7 +19,7 @@ var Windy = function( params ){
   var FRAME_RATE = 40;                      // desired milliseconds per frame
 
   var NULL_WIND_VECTOR = [NaN, NaN, null];  // singleton for no wind in the form: [u, v, magnitude]
-  var TRANSPARENT_BLACK = [0, 0, 0, 0];
+  var TRANSPARENT_BLACK = [255, 0, 0, 0];
 
 
 
@@ -209,10 +209,7 @@ var Windy = function( params ){
         var H = Math.pow(10, -5.2);
         var hλ = λ < 0 ? H : -H;
         var hφ = φ < 0 ? H : -H;
-        //console.log('huh', [λ + hλ, φ]);
         var pλ = projection([λ + hλ, φ]);
-        //console.log(pλ);
-        //zzz(pλ)
         var pφ = projection([λ, φ + hφ]);
 
         // Meridian scale factor (see Snyder, equation 4-3), where R = 1. This handles issue where length of 1º λ
@@ -267,10 +264,11 @@ var Windy = function( params ){
   function buildBounds( bounds, width, height ) {
       var upperLeft = bounds[0];
       var lowerRight = bounds[1];
-      var x = 0;  //Math.round(upperLeft[0]); //Math.max(Math.floor(upperLeft[0], 0), 0);
+      var x = Math.round(upperLeft[0]); //Math.max(Math.floor(upperLeft[0], 0), 0);
       var y = Math.max(Math.floor(upperLeft[1], 0), 0);
       var xMax = Math.min(Math.ceil(lowerRight[0], width), width - 1);
       var yMax = Math.min(Math.ceil(lowerRight[1], height), height - 1);
+
       return {x: x, y: y, xMax: xMax, yMax: yMax, width: width, height: height};
   }
 
@@ -279,12 +277,19 @@ var Windy = function( params ){
         return [λ, 0];
     }
 
+  var project = function(x) {
+    var point = map.pointLocation(new MM.Point(x[1], x[0]));
+    return [point.lat, point.lon];
+  };
+
   function interpolateField( grid, bounds, callback ) {
     //var mask = createMask(globe);
     //log.time("interpolating field");
     //var d = when.defer(), cancel = this.cancel;
 
-    var projection = d3.geo.mercator().rotate(currentPosition()).precision(0.1); //globe.projection;
+    //var projection = d3.geo.path().projection(project); //d3.geo.mercator().projection(project);; //globe.projection;
+    projection = d3.geo.mercator().precision(.1); //globe.projection;
+    //console.log(projection());
     //var bounds = [[-180, 90], [180, -90]]; //globe.bounds(view);
     var velocityScale = bounds.height * VELOCITY_SCALE;
     console.log('velocityScale', velocityScale);
@@ -299,8 +304,9 @@ var Windy = function( params ){
         for (var y = bounds.y; y <= bounds.yMax; y += 2) {
             //if (mask.isVisible(x, y)) {
                 point[0] = x; point[1] = y;
-                var p2 = new MM.Point(x, y);
-                var loc = map.pointLocation(p2);
+                //var p2 = new MM.Point(x, y);
+                //var loc = map.pointLocation(p2);
+                //console.log('invert', point, projection.invert(point), loc, project(point)); debugger;
                 var coord = projection.invert(point); //[loc.lon, loc.lat]; //point; // TODO come back to this: projection.invert(point);
                 var color = TRANSPARENT_BLACK;
                 if (coord) {
@@ -308,9 +314,7 @@ var Windy = function( params ){
                     if (isFinite(λ)) {
                         var wind = grid.interpolate(λ, φ);
                         if (wind) {
-                            //console.log(wind);
                             wind = distort(projection, λ, φ, x, y, velocityScale, wind);
-                            //zzz(wind);
                             column[y+1] = column[y] = wind;
                             //color = gradient(proportion(wind[2], scale.bounds), OVERLAY_ALPHA);
                         }
@@ -328,8 +332,8 @@ var Windy = function( params ){
                 console.log('start while', x, bounds.xMax);
                 while (x < bounds.xMax) {
                     interpolateColumn(x);
-                    x += 2;
-                    if ((Date.now() - start) > 100) { //MAX_TASK_TIME) {
+                    x += 1;
+                    if ((Date.now() - start) > 200) { //MAX_TASK_TIME) {
                         // Interpolation is taking too long. Schedule the next batch for later and yield.
                         //report.progress((x - bounds.x) / (bounds.xMax - bounds.x));
                         setTimeout(batchInterpolate, 25);
@@ -371,7 +375,7 @@ var Windy = function( params ){
     var buckets = colorStyles.map(function() { return []; });
     var particleCount = Math.round(bounds.width * PARTICLE_MULTIPLIER);
     //if (µ.isMobile()) {
-      particleCount *= .5; //PARTICLE_REDUCTION;
+      //particleCount *= .75; //PARTICLE_REDUCTION;
     //}
     
     var fadeFillStyle = "rgba(0, 0, 0, 0.97)";
