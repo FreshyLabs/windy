@@ -205,7 +205,6 @@ var Windy = function( params ){
 
 
    function distortion(projection, λ, φ, x, y) {
-//        console.log('distortion', λ, φ, x, y)
         var τ = 2 * Math.PI;
         var H = Math.pow(10, -5.2);
         var hλ = λ < 0 ? H : -H;
@@ -215,10 +214,6 @@ var Windy = function( params ){
         //var pλ = projection([λ + hλ, φ]);
         //var pφ = projection([λ, φ + hφ]);
         
-        //console.log([λ + hλ, φ], pλ, project([λ + hλ, φ]) ); debugger;
-
-        //console.log(project([λ, φ + hφ]), projection([λ, φ + hφ])); debugger;
-
         // Meridian scale factor (see Snyder, equation 4-3), where R = 1. This handles issue where length of 1º λ
         // changes depending on φ. Without this, there is a pinching effect at the poles.
         var k = Math.cos(φ / 360 * τ);
@@ -246,7 +241,7 @@ var Windy = function( params ){
         // Frees the massive "columns" array for GC. Without this, the array is leaked (in Chrome) each time a new
         // field is interpolated because the field closure's context is leaked, for reasons that defy explanation.
         field.release = function() {
-            columns = null;
+            columns = [];
         };
 
         field.randomize = function(o) {  // UNDONE: this method is terrible
@@ -279,10 +274,10 @@ var Windy = function( params ){
       return {x: x, y: y, xMax: width, yMax: yMax, width: width, height: height};
   }
 
-   function currentPosition() {
+  function currentPosition() {
         var λ = floorMod(new Date().getTimezoneOffset() / 4, 360);  // 24 hours * 60 min / 4 === 360 degrees
         return [λ, 0];
-    }
+  }
 
   var invert = function(x) {
     var point = map.pointLocation(new MM.Point(x[1], x[0]));
@@ -300,12 +295,9 @@ var Windy = function( params ){
   }
 
   function interpolateField( grid, bounds, callback ) {
-    //var mask = createMask(globe);
-    //log.time("interpolating field");
-    //var d = when.defer(), cancel = this.cancel;
 
-    projection = d3.geo.mercator().precision(.1); //globe.projection;
-    var velocityScale = bounds.yMax * VELOCITY_SCALE;
+    var projection = d3.geo.mercator().precision(.1); 
+    var velocityScale = bounds.height * VELOCITY_SCALE;
 
     var columns = [];
     var point = [];
@@ -315,13 +307,11 @@ var Windy = function( params ){
     function interpolateColumn(x) {
         var column = [];
         for (var y = bounds.y; y <= bounds.yMax; y += 2) {
-            //if (mask.isVisible(x, y)) {
                 point[1] = x; point[0] = y;
-                var coord = invert(point); //[loc.lon, loc.lat]; //point; // TODO come back to this: projection.invert(point);
+                var coord = invert(point);
                 var color = TRANSPARENT_BLACK;
                 if (coord) {
                     var λ = coord[0], φ = coord[1];
-                    //console.log(x,y, coord[0],coord[1], invert(point)); debugger;
                     if (isFinite(λ)) {
                         var wind = grid.interpolate(λ, φ);
                         if (wind) {
@@ -332,7 +322,6 @@ var Windy = function( params ){
                     }
                 }
                 //mask.set(x, y, color).set(x+1, y, color).set(x, y+1, color).set(x+1, y+1, color);
-            //}
         }
         columns[x+1] = columns[x] = column;
     }
@@ -340,11 +329,11 @@ var Windy = function( params ){
     (function batchInterpolate() {
         try {
                 var start = Date.now();
-                console.log('start while', x, bounds.width);
+                //console.log('start while', x, bounds.width);
                 while (x < bounds.width) {
                     interpolateColumn(x);
                     x += 2;
-                    if ((Date.now() - start) > 200) { //MAX_TASK_TIME) {
+                    if ((Date.now() - start) > 400) { //MAX_TASK_TIME) {
                         // Interpolation is taking too long. Schedule the next batch for later and yield.
                         //report.progress((x - bounds.x) / (bounds.xMax - bounds.x));
                         setTimeout(batchInterpolate, 25);
@@ -368,8 +357,8 @@ var Windy = function( params ){
   
     function windIntensityColorScale(step, maxWind) {
         var result = [];
-        for (var j = 0; j <= 255; j += step) {
-            result.push(asColorStyle(j, j, j, 1.0));
+        for (var j = 200; j >= 0; j = j - step) {
+            result.push(asColorStyle(j, j, j, .5));
         }
         result.indexFor = function(m) {  // map wind speed to a style
             return Math.floor(Math.min(m, maxWind) / maxWind * (result.length - 1));
@@ -462,27 +451,28 @@ var Windy = function( params ){
     })();
   }
 
-  function update( bounds, width, height ){
-    console.log('init the wind grid', bounds, buildBounds( bounds, width, height));
-    if (windy.field) windy.field.release();
+  function start( bounds, width, height ){
+    stop();
     // build grid 
     buildGrid( params.data, function(grid){
       // interpolateField
       // create Field
-      //console.log('windy', windy) 
       interpolateField( grid, buildBounds( bounds, width, height), function( bounds, field ){
         // animate the canvas with random points 
-        //console.log('done', field.randomize );
         windy.field = field;
         animate( bounds, field );
       });
     });
   }
 
+  function stop(){
+    if (windy.field) windy.field.release();
+  }
+
   var windy = {
     params: params,
-    animate: animate,
-    update: update
+    start: start,
+    stop: stop
   };
 
   return windy;

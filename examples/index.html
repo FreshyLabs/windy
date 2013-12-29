@@ -17,7 +17,7 @@
       function initMap(){
         var provider = new com.modestmaps.TemplatedLayer('http://freshymap.com/tiles/{Y}/{X}/{Z}.png');
         map = new com.modestmaps.Map('map', provider); 
-        map.setCenterZoom(new MM.Location( 0, 0), 2);
+        map.setCenterZoom(new MM.Location( 39, -99), 5);
 
         // get corner positions 
         var global = [[-175, 79],[ 175, -79]];
@@ -74,7 +74,7 @@
               }*/
 
               //var bounds = d3.geo.path().projection(projection).bounds(sphere);
-              windy.update( [[ul.x, ul.y], [lr.x, lr.y]], width, height );
+              windy.start( [[ul.x, ul.y], [lr.x, lr.y]], width, height );
             }
             adjustTO = undefined;
 
@@ -82,7 +82,14 @@
 
         }
       
-        map.addCallback('drawn', update);
+        map.addCallback('drawn', function(){ 
+          var ctx = canvas.node().getContext('2d');
+          ctx.clearRect(0, 0, map.dimensions.x, map.dimensions.y);
+          if (windy){
+            windy.stop();
+          }
+          update(); 
+        });
         map.addCallback('resized', function() {
           var ctx = canvas.node().getContext('2d');
           ctx.clearRect(0, 0, map.dimensions.x, map.dimensions.y);
