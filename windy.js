@@ -13,10 +13,10 @@ var Windy = function( params ){
   var INTENSITY_SCALE_STEP = 10;            // step size of particle intensity color scale
   var MAX_WIND_INTENSITY = 17;              // wind velocity at which particle intensity is maximum (m/s)
   var MAX_PARTICLE_AGE = 100;               // max number of frames a particle is drawn before regeneration
-  var PARTICLE_LINE_WIDTH = 1.0;            // line width of a drawn particle
+  var PARTICLE_LINE_WIDTH = .5;            // line width of a drawn particle
   var PARTICLE_MULTIPLIER = 7;              // particle count scalar (completely arbitrary--this values looks nice)
   var PARTICLE_REDUCTION = 0.75;            // reduce particle count to this much of normal for mobile devices
-  var FRAME_RATE = 40;                      // desired milliseconds per frame
+  var FRAME_RATE = 30;                      // desired milliseconds per frame
 
   var NULL_WIND_VECTOR = [NaN, NaN, null];  // singleton for no wind in the form: [u, v, magnitude]
   var TRANSPARENT_BLACK = [255, 0, 0, 0];
@@ -205,12 +205,19 @@ var Windy = function( params ){
 
 
    function distortion(projection, λ, φ, x, y) {
+//        console.log('distortion', λ, φ, x, y)
         var τ = 2 * Math.PI;
         var H = Math.pow(10, -5.2);
         var hλ = λ < 0 ? H : -H;
         var hφ = φ < 0 ? H : -H;
-        var pλ = projection([λ + hλ, φ]);
-        var pφ = projection([λ, φ + hφ]);
+        var pλ = project([λ + hλ, φ]);
+        var pφ = project([λ, φ + hφ]);
+        //var pλ = projection([λ + hλ, φ]);
+        //var pφ = projection([λ, φ + hφ]);
+        
+        //console.log([λ + hλ, φ], pλ, project([λ + hλ, φ]) ); debugger;
+
+        //console.log(project([λ, φ + hφ]), projection([λ, φ + hφ])); debugger;
 
         // Meridian scale factor (see Snyder, equation 4-3), where R = 1. This handles issue where length of 1º λ
         // changes depending on φ. Without this, there is a pinching effect at the poles.
@@ -246,8 +253,8 @@ var Windy = function( params ){
             var x, y;
             var safetyNet = 0;
             do { 
-                x = Math.round(Math.floor(Math.random() * bounds.xMax) + bounds.x);
-                y = Math.round(Math.floor(Math.random() * bounds.yMax) + bounds.y)
+                x = Math.round(Math.floor(Math.random() * bounds.width) + bounds.x);
+                y = Math.round(Math.floor(Math.random() * bounds.height) + bounds.y)
             } while (field(x, y)[2] === null && safetyNet++ < 30);
             o.x = x;
             o.y = y;
@@ -269,7 +276,7 @@ var Windy = function( params ){
       var xMax = Math.min(Math.ceil(lowerRight[0], width), width - 1);
       var yMax = Math.min(Math.ceil(lowerRight[1], height), height - 1);
 
-      return {x: x, y: y, xMax: xMax, yMax: yMax, width: width, height: height};
+      return {x: x, y: y, xMax: width, yMax: yMax, width: width, height: height};
   }
 
    function currentPosition() {
@@ -277,22 +284,28 @@ var Windy = function( params ){
         return [λ, 0];
     }
 
-  var project = function(x) {
+  var invert = function(x) {
     var point = map.pointLocation(new MM.Point(x[1], x[0]));
-    return [point.lat, point.lon];
+    return [point.lon, point.lat];
   };
+
+  var project = function(x) {
+    var point = map.locationPoint(new MM.Location(x[1], x[0]));
+    return [point.x, point.y];
+  };
+
+  
+  function ensureNumber(num, fallback) {
+    return _.isFinite(num) || num === Infinity || num === -Infinity ? num : fallback;
+  }
 
   function interpolateField( grid, bounds, callback ) {
     //var mask = createMask(globe);
     //log.time("interpolating field");
     //var d = when.defer(), cancel = this.cancel;
 
-    //var projection = d3.geo.path().projection(project); //d3.geo.mercator().projection(project);; //globe.projection;
     projection = d3.geo.mercator().precision(.1); //globe.projection;
-    //console.log(projection());
-    //var bounds = [[-180, 90], [180, -90]]; //globe.bounds(view);
-    var velocityScale = bounds.height * VELOCITY_SCALE;
-    console.log('velocityScale', velocityScale);
+    var velocityScale = bounds.yMax * VELOCITY_SCALE;
 
     var columns = [];
     var point = [];
@@ -303,14 +316,12 @@ var Windy = function( params ){
         var column = [];
         for (var y = bounds.y; y <= bounds.yMax; y += 2) {
             //if (mask.isVisible(x, y)) {
-                point[0] = x; point[1] = y;
-                //var p2 = new MM.Point(x, y);
-                //var loc = map.pointLocation(p2);
-                //console.log('invert', point, projection.invert(point), loc, project(point)); debugger;
-                var coord = projection.invert(point); //[loc.lon, loc.lat]; //point; // TODO come back to this: projection.invert(point);
+                point[1] = x; point[0] = y;
+                var coord = invert(point); //[loc.lon, loc.lat]; //point; // TODO come back to this: projection.invert(point);
                 var color = TRANSPARENT_BLACK;
                 if (coord) {
                     var λ = coord[0], φ = coord[1];
+                    //console.log(x,y, coord[0],coord[1], invert(point)); debugger;
                     if (isFinite(λ)) {
                         var wind = grid.interpolate(λ, φ);
                         if (wind) {
@@ -329,10 +340,10 @@ var Windy = function( params ){
     (function batchInterpolate() {
         try {
                 var start = Date.now();
-                console.log('start while', x, bounds.xMax);
-                while (x < bounds.xMax) {
+                console.log('start while', x, bounds.width);
+                while (x < bounds.width) {
                     interpolateColumn(x);
-                    x += 1;
+                    x += 2;
                     if ((Date.now() - start) > 200) { //MAX_TASK_TIME) {
                         // Interpolation is taking too long. Schedule the next batch for later and yield.
                         //report.progress((x - bounds.x) / (bounds.xMax - bounds.x));
@@ -340,16 +351,11 @@ var Windy = function( params ){
                         return;
                     }
                 }
-          // call this via a callback!
-          //  d.resolve(createField(columns, bounds, mask));
           createField(columns, bounds, callback);
         }
         catch (e) {
             console.log('error in batch interp', e);
-            //d.reject(e);
         }
-    //    report.progress(1);  // 100% complete
-    //    log.timeEnd("interpolating field");
     })();
   }
 
@@ -362,7 +368,7 @@ var Windy = function( params ){
   
     function windIntensityColorScale(step, maxWind) {
         var result = [];
-        for (var j = 85; j <= 255; j += step) {
+        for (var j = 0; j <= 255; j += step) {
             result.push(asColorStyle(j, j, j, 1.0));
         }
         result.indexFor = function(m) {  // map wind speed to a style
@@ -463,7 +469,7 @@ var Windy = function( params ){
     buildGrid( params.data, function(grid){
       // interpolateField
       // create Field
-      console.log('windy', windy) 
+      //console.log('windy', windy) 
       interpolateField( grid, buildBounds( bounds, width, height), function( bounds, field ){
         // animate the canvas with random points 
         //console.log('done', field.randomize );

@@ -16,7 +16,7 @@
   
       function initMap(){
         var provider = new com.modestmaps.TemplatedLayer('http://freshymap.com/tiles/{Y}/{X}/{Z}.png');
-        map = new com.modestmaps.Map('map', []);//provider); 
+        map = new com.modestmaps.Map('map', provider); 
         map.setCenterZoom(new MM.Location( 0, 0), 2);
 
         // get corner positions 
@@ -26,12 +26,6 @@
         var width = lr.x - ul.x;
         var height = lr.y - ul.y;
 
-        /*canvas.style.position = 'absolute';
-        canvas.style.border = '1px solid red';
-        canvas.style.left = ul.x+'px';
-        canvas.style.top = ul.y+'px';
-        canvas.width = width;
-        canvas.height = height;*/
         //map.parent.appendChild(canvas);
 
 
@@ -39,14 +33,11 @@
 
         projection = d3.geo.mercator().center([0,0]);
 
-        console.log("position: absolute; left: "+ul.x+"px; top: "+ul.y+"px;");
-
         var canvas = d3.select("#map").append("canvas")
-          .attr("width", width)
-          .attr("height", height)
-          .attr("style", "position: absolute; left: "+ul.x+"px;" );
+          .attr("width", map.dimensions.x)
+          .attr("height", map.dimensions.y)
+          .attr("style", "position: absolute; left: 0px;" );
     
-        
 
         d3.json('./data/gfs.json', function(err, data){
           windy = new Windy({canvas: canvas.node(), data: data});
@@ -54,49 +45,51 @@
         });
 
         var adjustTO;
+
+        var project = function(x) {
+          var point = map.locationPoint(new MM.Location(x[1], x[0]));
+          return [point.x, point.y];
+        };
       
         function update() {
           var ctx = canvas.node().getContext('2d');
-          ctx.clearRect(0, 0, width, height);
+          ctx.clearRect(0, 0, map.dimensions.x, map.dimensions.y);
           
           if ( typeof( adjustTO ) != 'undefined' ) window.clearTimeout(adjustTO);
 
           adjustTO = setTimeout(function(){
 
-/*            var ul = map.locationPoint( new MM.Location(global[0][1], global[0][0]));
-            var lr = map.locationPoint( new MM.Location(global[1][1], global[1][0]));
-            var width = lr.x + ul.x;
-            var height = lr.y + ul.y;*/
-            adjustTO = undefined;
-
             if ( windy ){
-              //var extent = map.getExtent();
-              //var ul = map.locationPoint(extent.northWest());
-              //var lr = map.locationPoint(extent.southEast());
-              //console.log(d3.geo.path().projection(projection).bounds(sphere));
-              var bounds = d3.geo.path().projection(projection).bounds(sphere);
-              windy.update( bounds, width, height );
+              var extent = map.getExtent(),
+                ul = map.locationPoint(extent.northWest()),
+                lr = map.locationPoint(extent.southEast()),
+                width = lr.x + ul.x,
+                height = lr.y + ul.y;
+
+             /* if (extent.northWest().lon < -180) { 
+                var ul = map.locationPoint( new MM.Location(global[0][1], global[0][0])),
+                  lr = map.locationPoint( new MM.Location(global[1][1], global[1][0])),
+                  width = lr.x + ul.x,
+                  height = lr.y + ul.y;
+              }*/
+
+              //var bounds = d3.geo.path().projection(projection).bounds(sphere);
+              windy.update( [[ul.x, ul.y], [lr.x, lr.y]], width, height );
             }
+            adjustTO = undefined;
 
           }, 200);
 
-          //ctx.strokeStyle = '#404040';
-          //ctx.beginPath();
-          //var p = map.locationPoint(locations[0]);
-          //ctx.moveTo(p.x,p.y);
-          //for (var i = 1; i < locations.length; i++) {
-          //  p = map.locationPoint(locations[i]);
-          //  ctx.lineTo(p.x,p.y);
-          //}
-          //ctx.stroke();
         }
       
-        /*map.addCallback('drawn', update);
+        map.addCallback('drawn', update);
         map.addCallback('resized', function() {
+          var ctx = canvas.node().getContext('2d');
+          ctx.clearRect(0, 0, map.dimensions.x, map.dimensions.y);
           canvas.width = map.dimensions.x;
           canvas.height = map.dimensions.y;
           update();
-        });*/
+        });
       
         update( );
       }
